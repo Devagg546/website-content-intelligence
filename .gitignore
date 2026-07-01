@@ -1,0 +1,15 @@
+# Virtual environment
+venv/
+
+# Crawl output files
+*.json
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment variables (for later when we add API keys)
+.env
+
+# Mac junk
+.DS_Store
