@@ -1,65 +1,39 @@
 # =============================================================================
-# Python
+# Core Framework
 # =============================================================================
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-*.egg-info/
-dist/
-build/
-*.egg
-.eggs/
-
-# Virtual environments
-venv/
-.venv/
-env/
-ENV/
-
-# Environment variables
-.env
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+pydantic-settings==2.5.0
+python-dotenv==1.0.1
 
 # =============================================================================
-# Node.js
+# Web Crawling
 # =============================================================================
-node_modules/
-dist/
-.cache/
-*.tsbuildinfo
+playwright==1.47.0
+beautifulsoup4==4.12.3
+requests==2.32.0
+lxml==5.3.0
 
 # =============================================================================
-# Runtime Data
+# Content Processing & RAG
 # =============================================================================
-backend/data/*.db
-backend/data/*.sqlite
-backend/data/chroma/
-backend/data/chromadb/
-*.log
+langchain==0.3.0
+langchain-community==0.3.0
+langchain-text-splitters==0.3.0
 
 # =============================================================================
-# IDE & OS
+# Embeddings & Vector Store
 # =============================================================================
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-desktop.ini
+sentence-transformers==3.0.0
+chromadb==0.5.0
 
 # =============================================================================
-# Testing
+# LLM Integration
 # =============================================================================
-.pytest_cache/
-.coverage
-htmlcov/
-coverage/
+httpx==0.27.0
+openai==1.50.0
 
 # =============================================================================
-# Misc
+# Utilities
 # =============================================================================
-*.bak
-*.tmp
-.snapshots/
+aiofiles==24.1.0
