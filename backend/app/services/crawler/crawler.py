@@ -1,13 +1,11 @@
 """
-Web Crawler — BFS-based website crawler using Playwright.
-
+Web Crawler — BFS-based website crawler.
 Crawls a website starting from a root URL, following internal links
-using breadth-first search. Stops when max_pages is reached or
-all discoverable pages have been visited.
+using breadth-first search. Uses PageParser and LinkExtractor.
 """
 
-import asyncio
 import uuid
+import requests
 from collections import deque
 from datetime import datetime
 from typing import Optional
@@ -21,11 +19,11 @@ from app.services.crawler.link_extractor import LinkExtractor
 class CrawlJob:
     """Represents a single crawl job with its state and progress."""
 
-    def __init__(self, url: str, max_pages: int = 500):
+    def __init__(self, url: str, max_pages: int = None):
         self.job_id: str = str(uuid.uuid4())
         self.root_url: str = url
-        self.max_pages: int = max_pages
-        self.status: str = "queued"  # queued | in_progress | completed | failed
+        self.max_pages: int = max_pages or settings.max_crawl_pages
+        self.status: str = "queued"
         self.pages_crawled: int = 0
         self.pages_total: int = 0
         self.started_at: Optional[datetime] = None
@@ -34,65 +32,79 @@ class CrawlJob:
 
 
 class WebCrawler:
-    """
-    BFS web crawler using Playwright for page rendering
-    and BeautifulSoup for content extraction.
-    """
+    """BFS web crawler using requests, PageParser and LinkExtractor."""
 
     def __init__(self):
         self.parser = PageParser()
         self.link_extractor = LinkExtractor()
 
-    async def crawl(self, job: CrawlJob, db_conn) -> None:
+    def fetch_html(self, url: str) -> Optional[str]:
+        """Fetch raw HTML from a URL."""
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            return response.text
+        except requests.RequestException as e:
+            print(f"Failed to fetch {url}: {e}")
+            return None
+
+    def crawl(self, job: CrawlJob) -> list[dict]:
         """
         Execute a crawl job using breadth-first search.
-
-        Algorithm:
-        1. Start from root URL
-        2. Add all internal links to a queue
-        3. Visit each link, extract content, add new links
-        4. Stop at max_pages or when queue is empty
-        5. Use a set() to avoid visiting the same URL twice
-
-        Args:
-            job: The CrawlJob instance with configuration
-            db_conn: SQLite database connection for storing results
+        Returns list of page data dictionaries.
         """
-        # TODO: Implement BFS crawl logic
-        # 1. Initialize Playwright browser (headless)
-        # 2. Create visited set and page queue (deque)
-        # 3. Parse root_url domain for internal link filtering
-        # 4. BFS loop:
-        #    a. Dequeue URL
-        #    b. Visit with Playwright
-        #    c. Extract content with BeautifulSoup (via parser)
-        #    d. Extract internal links (via link_extractor)
-        #    e. Store page data in SQLite
-        #    f. Add new internal links to queue
-        #    g. Update job progress
-        # 5. Update job status to completed/failed
-        pass
+        parsed_start = urlparse(job.root_url)
+        base_domain = parsed_start.netloc
 
-    async def _visit_page(self, url: str) -> Optional[dict]:
-        """
-        Visit a single page using Playwright and extract its content.
+        visited = set()
+        queue = deque([job.root_url])
+        all_pages = []
 
-        Returns:
-            Dict with page data (url, title, meta_description, h1, body_text, etc.)
-            or None if the page couldn't be loaded.
-        """
-        # TODO: Implement Playwright page visit
-        # 1. Navigate to URL with timeout
-        # 2. Wait for page load
-        # 3. Get page HTML content
-        # 4. Parse with BeautifulSoup via self.parser
-        # 5. Return structured page data
-        pass
+        job.status = "in_progress"
+        job.started_at = datetime.now()
 
-    def _is_internal_link(self, link: str, root_domain: str) -> bool:
-        """Check if a link belongs to the same domain as the root URL."""
-        try:
-            parsed = urlparse(link)
-            return parsed.netloc == root_domain or parsed.netloc == ""
-        except Exception:
-            return False
+        print(f"Starting crawl: {job.root_url}")
+        print(f"Max pages: {job.max_pages}")
+        print("-" * 50)
+
+        while queue and len(visited) < job.max_pages:
+            url = queue.popleft()
+
+            if url in visited:
+                continue
+
+            print(f"Crawling ({len(visited) + 1}/{job.max_pages}): {url}")
+
+            # Fetch raw HTML
+            html = self.fetch_html(url)
+            if html is None:
+                visited.add(url)
+                continue
+
+            # Parse page content using Sarvesh's PageParser
+            page_data = self.parser.parse(html, url)
+
+            # Add crawl date
+            page_data["crawl_date"] = str(datetime.now().date())
+
+            all_pages.append(page_data)
+
+            # Extract internal links using Sarvesh's LinkExtractor
+            new_links = self.link_extractor.extract_internal_links(
+                html, url, base_domain
+            )
+
+            for link in new_links:
+                if link not in visited:
+                    queue.append(link)
+
+            visited.add(url)
+            job.pages_crawled = len(all_pages)
+
+        job.status = "completed"
+        job.completed_at = datetime.now()
+
+        print("-" * 50)
+        print(f"Crawl complete. Pages crawled: {len(all_pages)}")
+
+        return all_pages
