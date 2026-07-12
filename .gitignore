@@ -63,3 +63,11 @@ coverage/
 *.bak
 *.tmp
 .snapshots/
+
+
+# Crawl output files
+crawl_output.json
+chunks_output.json
+
+# Root data folder
+data/
