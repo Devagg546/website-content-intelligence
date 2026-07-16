@@ -2,17 +2,13 @@ import { useState } from 'react';
 import ChatWindow from '../components/chat/ChatWindow';
 import ChatInput from '../components/chat/ChatInput';
 import askApi from '../api/askApi';
+import { useAppContext } from '../context/AppContext';
 
-/**
- * Ask AI Page — /ask
- * Chat-based Q&A interface with source citations.
- */
 function AskAIPage() {
-  const [messages, setMessages] = useState([]);
+  const { messages, setMessages } = useAppContext();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSend = async (question) => {
-    // Add user message immediately
     const userMessage = { role: 'user', content: question };
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);

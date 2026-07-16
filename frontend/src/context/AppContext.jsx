@@ -1,28 +1,25 @@
 import { createContext, useContext, useState } from 'react';
 
-/**
- * Global application context.
- * Stores shared state like crawl status and system health.
- */
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
   const [activeCrawlJobId, setActiveCrawlJobId] = useState(null);
   const [systemStatus, setSystemStatus] = useState('online');
   const [lastCrawledUrl, setLastCrawledUrl] = useState('');
+  const [crawlStatus, setCrawlStatus] = useState(null);
+  const [messages, setMessages] = useState([]);
 
   const value = {
-    // Crawl state
     activeCrawlJobId,
     setActiveCrawlJobId,
-
-    // System status
     systemStatus,
     setSystemStatus,
-
-    // Last crawled URL
     lastCrawledUrl,
     setLastCrawledUrl,
+    crawlStatus,
+    setCrawlStatus,
+    messages,
+    setMessages,
   };
 
   return (
