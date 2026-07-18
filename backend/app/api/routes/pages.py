@@ -1,9 +1,5 @@
 """
 Pages routes — List and retrieve crawled pages.
-
-Endpoints:
-    GET /api/pages           — List all crawled pages (paginated)
-    GET /api/pages/{page_id} — Get a single page's details
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -24,8 +20,49 @@ async def list_pages(
     """
     List all crawled pages with pagination and optional keyword filter.
     """
-    # TODO: Query pages from SQLite with pagination
-    return PageListResponse(pages=[], total=0, page=page, per_page=per_page)
+    cursor = db.cursor()
+
+    # Build query with optional search filter
+    base_query = "FROM pages"
+    params = []
+
+    if search:
+        base_query += " WHERE title LIKE ? OR url LIKE ?"
+        search_term = f"%{search}%"
+        params.extend([search_term, search_term])
+
+    # Get total count
+    cursor.execute(f"SELECT COUNT(*) {base_query}", params)
+    total = cursor.fetchone()[0]
+
+    # Get paginated results
+    offset = (page - 1) * per_page
+    query = f"""
+        SELECT id, url, title, meta_description, h1, body_text,
+               canonical_url, crawl_date, word_count
+        {base_query}
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?
+    """
+    cursor.execute(query, params + [per_page, offset])
+    rows = cursor.fetchall()
+
+    pages_list = [
+        PageResponse(
+            id=row["id"],
+            url=row["url"],
+            title=row["title"] or "",
+            meta_description=row["meta_description"] or "",
+            h1=row["h1"] or "",
+            body_text=row["body_text"] or "",
+            canonical_url=row["canonical_url"],
+            crawl_date=row["crawl_date"],
+            word_count=row["word_count"] or 0,
+        )
+        for row in rows
+    ]
+
+    return PageListResponse(pages=pages_list, total=total, page=page, per_page=per_page)
 
 
 @router.get("/{page_id}", response_model=PageResponse)
@@ -33,15 +70,28 @@ async def get_page(page_id: int, db=Depends(get_db)):
     """
     Get full details for a single crawled page.
     """
-    # TODO: Query single page by ID
+    cursor = db.cursor()
+    cursor.execute(
+        """
+        SELECT id, url, title, meta_description, h1, body_text,
+               canonical_url, crawl_date, word_count
+        FROM pages WHERE id = ?
+        """,
+        (page_id,),
+    )
+    row = cursor.fetchone()
+
+    if not row:
+        return PageResponse(id=page_id, url="", title="", word_count=0)
+
     return PageResponse(
-        id=page_id,
-        url="",
-        title="",
-        meta_description="",
-        h1="",
-        body_text="",
-        canonical_url="",
-        crawl_date=None,
-        word_count=0,
+        id=row["id"],
+        url=row["url"],
+        title=row["title"] or "",
+        meta_description=row["meta_description"] or "",
+        h1=row["h1"] or "",
+        body_text=row["body_text"] or "",
+        canonical_url=row["canonical_url"],
+        crawl_date=row["crawl_date"],
+        word_count=row["word_count"] or 0,
     )
