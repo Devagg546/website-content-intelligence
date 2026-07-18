@@ -80,7 +80,7 @@ def get_db_connection() -> sqlite3.Connection:
     Create and return a new SQLite database connection.
     Uses Row factory for dict-like row access.
     """
-    conn = sqlite3.connect(str(Path(settings.sqlite_db_path)))
+    conn = sqlite3.connect(str(Path(settings.sqlite_db_path)), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")  # Better concurrent read performance
     return conn
