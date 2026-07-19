@@ -119,25 +119,43 @@ class GapService:
     def _find_duplicate_content(self, db_conn) -> list[DuplicatePair]:
         """
         Find pages with highly similar content.
-        Uses text similarity (SequenceMatcher) on body text.
-        Note: compares every page pair, so this is best suited for smaller sites.
+        Optimized: only compares pages with similar word counts (within 20%),
+        since pages with very different lengths can never be near-duplicates.
+        This avoids the O(n²) full-comparison cost on large sites.
         """
         cursor = db_conn.cursor()
-        cursor.execute("SELECT url, body_text FROM pages WHERE body_text IS NOT NULL AND body_text != ''")
+        cursor.execute(
+            "SELECT url, body_text, word_count FROM pages WHERE body_text IS NOT NULL AND body_text != ''"
+        )
         rows = cursor.fetchall()
 
-        pages = [(row["url"], row["body_text"]) for row in rows]
+        pages = [(row["url"], row["body_text"], row["word_count"] or 0) for row in rows]
+
+        # Sort by word count so similar-length pages sit near each other
+        pages.sort(key=lambda p: p[2])
+
         duplicates = []
+        n = len(pages)
 
-        for i in range(len(pages)):
-            for j in range(i + 1, len(pages)):
-                url_a, text_a = pages[i]
-                url_b, text_b = pages[j]
+        for i in range(n):
+            url_a, text_a, count_a = pages[i]
+            if count_a == 0:
+                continue
 
-                # Compare only a sample of the text for speed on longer pages
-                sample_a = text_a[:2000]
+            sample_a = text_a[:2000]
+
+            # Only look forward at pages with word count within 20% of this one
+            for j in range(i + 1, n):
+                url_b, text_b, count_b = pages[j]
+
+                # Since sorted by word count, once the gap is too big, stop looking further
+                if count_b > count_a * 1.2:
+                    break
+
+                if count_b < count_a * 0.8:
+                    continue
+
                 sample_b = text_b[:2000]
-
                 similarity = SequenceMatcher(None, sample_a, sample_b).ratio()
 
                 if similarity >= self.DUPLICATE_SIMILARITY_THRESHOLD:
