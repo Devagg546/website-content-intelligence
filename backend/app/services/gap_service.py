@@ -6,9 +6,11 @@ Detects:
 - Missing meta descriptions
 - Missing H1 tags
 - Thin content (below word count threshold)
-- Duplicate content (high content similarity)
-- Orphan pages (no internal links)
+- Duplicate content (high text similarity)
+- Orphan pages (no internal links pointing to them)
 """
+
+from difflib import SequenceMatcher
 
 from app.models.gaps import GapsResponse, GapItem, DuplicatePair
 
@@ -16,21 +18,12 @@ from app.models.gaps import GapsResponse, GapItem, DuplicatePair
 class GapService:
     """Detects content gaps, SEO issues, and quality problems."""
 
-    # Minimum word count threshold for "thin content"
-    THIN_CONTENT_THRESHOLD = 100
-
-    # Similarity threshold for "duplicate content"
+    THIN_CONTENT_THRESHOLD = 100  # words
     DUPLICATE_SIMILARITY_THRESHOLD = 0.85
 
     def detect_gaps(self, db_conn) -> GapsResponse:
         """
         Run all gap detection checks and compile a report.
-
-        Args:
-            db_conn: SQLite database connection
-
-        Returns:
-            GapsResponse with all detected issues
         """
         missing_title = self._find_missing_titles(db_conn)
         missing_meta = self._find_missing_meta_descriptions(db_conn)
@@ -60,33 +53,119 @@ class GapService:
 
     def _find_missing_titles(self, db_conn) -> list[GapItem]:
         """Find pages with empty or missing title tags."""
-        # TODO: SELECT * FROM pages WHERE title = '' OR title IS NULL
-        return []
+        cursor = db_conn.cursor()
+        cursor.execute(
+            "SELECT url, title FROM pages WHERE title IS NULL OR title = '' OR title = 'No title found'"
+        )
+        rows = cursor.fetchall()
+        return [
+            GapItem(url=row["url"], title="", issue="Missing page title", severity="high")
+            for row in rows
+        ]
 
     def _find_missing_meta_descriptions(self, db_conn) -> list[GapItem]:
         """Find pages with empty or missing meta descriptions."""
-        # TODO: SELECT * FROM pages WHERE meta_description = '' OR meta_description IS NULL
-        return []
+        cursor = db_conn.cursor()
+        cursor.execute(
+            """
+            SELECT url, title FROM pages
+            WHERE meta_description IS NULL OR meta_description = ''
+               OR meta_description = 'No meta description found'
+            """
+        )
+        rows = cursor.fetchall()
+        return [
+            GapItem(
+                url=row["url"],
+                title=row["title"] or "",
+                issue="Missing meta description",
+                severity="medium",
+            )
+            for row in rows
+        ]
 
     def _find_missing_h1(self, db_conn) -> list[GapItem]:
         """Find pages with empty or missing H1 tags."""
-        # TODO: SELECT * FROM pages WHERE h1 = '' OR h1 IS NULL
-        return []
+        cursor = db_conn.cursor()
+        cursor.execute(
+            "SELECT url, title FROM pages WHERE h1 IS NULL OR h1 = '' OR h1 = 'No H1 found'"
+        )
+        rows = cursor.fetchall()
+        return [
+            GapItem(
+                url=row["url"], title=row["title"] or "", issue="Missing H1 tag", severity="medium"
+            )
+            for row in rows
+        ]
 
     def _find_thin_content(self, db_conn) -> list[GapItem]:
         """Find pages with content below the word count threshold."""
-        # TODO: SELECT * FROM pages WHERE word_count < THIN_CONTENT_THRESHOLD
-        return []
+        cursor = db_conn.cursor()
+        cursor.execute(
+            "SELECT url, title, word_count FROM pages WHERE word_count < ? AND word_count > 0",
+            (self.THIN_CONTENT_THRESHOLD,),
+        )
+        rows = cursor.fetchall()
+        return [
+            GapItem(
+                url=row["url"],
+                title=row["title"] or "",
+                issue=f"Thin content: only {row['word_count']} words (recommended: {self.THIN_CONTENT_THRESHOLD}+)",
+                severity="low",
+            )
+            for row in rows
+        ]
 
     def _find_duplicate_content(self, db_conn) -> list[DuplicatePair]:
         """
         Find pages with highly similar content.
-        Uses embedding similarity via ChromaDB.
+        Uses text similarity (SequenceMatcher) on body text.
+        Note: compares every page pair, so this is best suited for smaller sites.
         """
-        # TODO: Compare page embeddings pairwise for high similarity
-        return []
+        cursor = db_conn.cursor()
+        cursor.execute("SELECT url, body_text FROM pages WHERE body_text IS NOT NULL AND body_text != ''")
+        rows = cursor.fetchall()
+
+        pages = [(row["url"], row["body_text"]) for row in rows]
+        duplicates = []
+
+        for i in range(len(pages)):
+            for j in range(i + 1, len(pages)):
+                url_a, text_a = pages[i]
+                url_b, text_b = pages[j]
+
+                # Compare only a sample of the text for speed on longer pages
+                sample_a = text_a[:2000]
+                sample_b = text_b[:2000]
+
+                similarity = SequenceMatcher(None, sample_a, sample_b).ratio()
+
+                if similarity >= self.DUPLICATE_SIMILARITY_THRESHOLD:
+                    duplicates.append(
+                        DuplicatePair(url_a=url_a, url_b=url_b, similarity_score=round(similarity, 3))
+                    )
+
+        return duplicates
 
     def _find_orphan_pages(self, db_conn) -> list[GapItem]:
-        """Find pages that have no internal links pointing to them."""
-        # TODO: Cross-reference internal links to find orphan pages
-        return []
+        """
+        Find pages that have no internal links pointing to them.
+        Requires the internal_links table to be populated during crawl.
+        """
+        cursor = db_conn.cursor()
+        cursor.execute(
+            """
+            SELECT p.url, p.title FROM pages p
+            WHERE p.url NOT IN (SELECT DISTINCT target_url FROM internal_links)
+            """
+        )
+        rows = cursor.fetchall()
+        return [
+            GapItem(
+                url=row["url"],
+                title=row["title"] or "",
+                issue="No internal links point to this page (orphan page)",
+                severity="low",
+            )
+            for row in rows
+        ]

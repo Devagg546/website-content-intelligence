@@ -87,12 +87,15 @@ class WebCrawler:
             # Add crawl date
             page_data["crawl_date"] = str(datetime.now().date())
 
-            all_pages.append(page_data)
-
             # Extract internal links using Sarvesh's LinkExtractor
             new_links = self.link_extractor.extract_internal_links(
                 html, url, base_domain
             )
+
+            # Save discovered links so we can build the internal_links table later
+            page_data["outgoing_links"] = list(new_links)
+
+            all_pages.append(page_data)
 
             for link in new_links:
                 if link not in visited:

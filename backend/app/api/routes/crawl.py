@@ -82,6 +82,18 @@ def run_crawl_pipeline(job: CrawlJob, db_path: str):
                 print(f"DB insert error for {page.get('url')}: {e}")
                 continue
 
+            # Save internal links for orphan page detection
+            outgoing_links = page.get("outgoing_links", [])
+            source_url = page.get("url", "")
+            for target_url in outgoing_links:
+                try:
+                    cursor.execute("""
+                        INSERT INTO internal_links (source_url, target_url, crawl_job_id)
+                        VALUES (?, ?, ?)
+                    """, (source_url, target_url, job.job_id))
+                except Exception as e:
+                    print(f"Link insert error: {e}")
+
             # Step 3 — Clean and chunk
             body_text = page.get("body_text", "")
             if not body_text or len(body_text.strip()) < 50:
