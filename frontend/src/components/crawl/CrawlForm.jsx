@@ -9,10 +9,13 @@ function CrawlForm({ onSubmit, isLoading = false }) {
   const [url, setUrl] = useState('');
   const [maxPages, setMaxPages] = useState(500);
 
+  const parsedMaxPages = parseInt(maxPages);
+  const isMaxPagesInvalid = maxPages === '' || isNaN(parsedMaxPages) || parsedMaxPages <= 0;
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (url.trim()) {
-      onSubmit({ url: url.trim(), maxPages });
+    if (url.trim() && !isMaxPagesInvalid) {
+      onSubmit({ url: url.trim(), maxPages: parsedMaxPages });
     }
   };
 
@@ -28,22 +31,28 @@ function CrawlForm({ onSubmit, isLoading = false }) {
         required
       />
 
-      <Input
-        id="max-pages"
-        label="Max Pages"
-        type="number"
-        min={1}
-        max={500}
-        value={maxPages}
-        onChange={(e) => setMaxPages(parseInt(e.target.value) || 500)}
-      />
+      <div>
+        <Input
+          id="max-pages"
+          label="Max Pages"
+          type="number"
+          min={0}
+          value={maxPages}
+          onChange={(e) => setMaxPages(e.target.value)}
+        />
+        {maxPages !== '' && parsedMaxPages === 0 && (
+          <p style={{ color: '#f87171', fontSize: '0.85rem', marginTop: '0.35rem' }}>
+            Enter number greater than 0.
+          </p>
+        )}
+      </div>
 
       <Button
         type="submit"
         variant="primary"
         size="lg"
         loading={isLoading}
-        disabled={!url.trim()}
+        disabled={!url.trim() || isMaxPagesInvalid}
         className="w-full"
       >
         {isLoading ? 'Starting Crawl...' : '🕷️ Start Crawling'}
