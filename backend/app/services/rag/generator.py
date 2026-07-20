@@ -35,6 +35,8 @@ class LLMGenerator:
             return await self._generate_ollama(system_prompt, user_prompt)
         elif self.provider == "openai":
             return await self._generate_openai(system_prompt, user_prompt)
+        elif self.provider == "gemini":
+            return await self._generate_gemini(system_prompt, user_prompt)
         else:
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
@@ -58,8 +60,6 @@ class LLMGenerator:
 
     async def _generate_openai(self, system_prompt: str, user_prompt: str) -> str:
         """Generate response using OpenAI API."""
-        # TODO: Implement OpenAI integration
-        # Uses the openai Python package
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(api_key=settings.openai_api_key)
@@ -73,6 +73,42 @@ class LLMGenerator:
             max_tokens=2000,
         )
         return response.choices[0].message.content or ""
+
+    async def _generate_gemini(self, system_prompt: str, user_prompt: str) -> str:
+        """Generate response using Google Gemini API."""
+        model_name = getattr(settings, "gemini_model", "gemini-1.5-flash")
+
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model_name}:generateContent?key={settings.google_api_key}"
+        )
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                url,
+                json={
+                    "system_instruction": {
+                        "parts": [{"text": system_prompt}]
+                    },
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [{"text": user_prompt}],
+                        }
+                    ],
+                    "generationConfig": {
+                        "temperature": 0.3,
+                        "maxOutputTokens": 2000,
+                    },
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            try:
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+            except (KeyError, IndexError):
+                return "I couldn't generate a response. Please try again."
 
 
 # Singleton instance

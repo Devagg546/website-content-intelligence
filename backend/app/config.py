@@ -51,6 +51,7 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     google_api_key: str = ""
+    gemini_model: str = "gemini-flash-latest"
 
     # ── RAG ──────────────────────────────────────────────────────────────
     chunk_size: int = 1000
