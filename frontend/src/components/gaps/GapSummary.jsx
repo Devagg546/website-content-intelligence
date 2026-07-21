@@ -2,8 +2,9 @@ import Badge from '../common/Badge';
 
 /**
  * Gap summary — overview cards showing issue counts by category.
+ * Clicking a card selects that category to view details below.
  */
-function GapSummary({ gaps = {} }) {
+function GapSummary({ gaps = {}, selectedKey, onSelect }) {
   const categories = [
     { key: 'missing_title', label: 'Missing Title', icon: '📄', severity: 'error' },
     { key: 'missing_meta_description', label: 'Missing Meta Description', icon: '📝', severity: 'warning' },
@@ -18,9 +19,18 @@ function GapSummary({ gaps = {} }) {
       {categories.map(({ key, label, icon, severity }) => {
         const items = gaps[key] || [];
         const count = items.length;
+        const isSelected = selectedKey === key;
 
         return (
-          <div key={key} className="glass-card p-4">
+          <button
+            key={key}
+            onClick={() => onSelect(key)}
+            className={`glass-card p-4 text-left transition-all ${
+              isSelected
+                ? 'ring-2 ring-brand-500 border-brand-500/50'
+                : 'hover:border-surface-600'
+            }`}
+          >
             <div className="flex items-center justify-between mb-2">
               <span className="text-lg">{icon}</span>
               <Badge variant={count > 0 ? severity : 'success'}>
@@ -31,7 +41,7 @@ function GapSummary({ gaps = {} }) {
             <p className="text-xs text-surface-500 mt-0.5">
               {count > 0 ? `${count} pages affected` : 'No issues detected'}
             </p>
-          </div>
+          </button>
         );
       })}
     </div>

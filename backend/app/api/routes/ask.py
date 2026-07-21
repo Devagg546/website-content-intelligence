@@ -52,14 +52,17 @@ async def ask_question(
     )
 
     # Step 5 — Build citations from retrieved chunks
+    # Step 5 — Build citations from retrieved chunks
     citations = []
     for chunk in chunks:
         metadata = chunk.get("metadata", {})
+        raw_score = chunk.get("relevance_score", 0.0)
+        clamped_score = max(0.0, min(1.0, raw_score))
         citations.append(Citation(
             page_title=metadata.get("title", "Unknown Page"),
             url=metadata.get("url", "Unknown URL"),
             snippet=chunk.get("content", "")[:200] + "...",
-            relevance_score=round(chunk.get("relevance_score", 0.0), 3),
+            relevance_score=round(clamped_score, 3),
         ))
 
     # Calculate overall confidence score as average of top chunks

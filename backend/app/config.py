@@ -49,9 +49,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
 
-    anthropic_api_key: str = ""
-    google_api_key: str = ""
-    gemini_model: str = "gemini-flash-latest"
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
 
     # ── RAG ──────────────────────────────────────────────────────────────
     chunk_size: int = 1000
